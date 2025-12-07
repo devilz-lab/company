@@ -270,7 +270,7 @@ export default function ChatPage() {
                     <VoicePlayer text={message.content} />
                     <MessageReactions
                       messageId={message.id}
-                      reactions={message.reactions}
+                      reactions={message.reactions || null}
                       onReaction={async (msgId, reaction) => {
                         // Toggle reaction
                         const currentReactions = messages.find(m => m.id === msgId)?.reactions || {}
