@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
     // Get conversation stats
     const { data: conversations, error: convError } = await supabase
       .from('conversations')
-      .select('id, created_at, mode')
+      .select('id, created_at, mode, persona_id')
       .eq('user_id', userId)
 
     // Get message stats
