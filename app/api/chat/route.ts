@@ -194,6 +194,11 @@ Be engaging, remember details, and help explore kinks safely. Respect boundaries
     const encoder = new TextEncoder()
     const readable = new ReadableStream({
       async start(controller) {
+        // Ensure stream is a ReadableStream
+        if (!(stream instanceof ReadableStream)) {
+          controller.error(new Error('Invalid stream type'))
+          return
+        }
         const reader = stream.getReader()
         let assistantContent = ''
 
