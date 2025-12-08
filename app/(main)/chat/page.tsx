@@ -221,13 +221,6 @@ export default function ChatPage() {
         }),
       })
 
-      // Get conversation ID from response headers
-      const convIdFromHeader = response.headers.get('X-Conversation-Id')
-      if (convIdFromHeader && !conversationId) {
-        setConversationId(convIdFromHeader)
-        window.history.replaceState({}, '', `/chat?conversation=${convIdFromHeader}`)
-      }
-
       if (!response.ok) {
         const errorText = await response.text()
         throw new Error(`API error: ${errorText}`)
