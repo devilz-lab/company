@@ -97,22 +97,30 @@ export default function ChatPage() {
         if (response.ok) {
           const data = await response.json()
           const lastConv = data.conversations?.[0]
-          if (lastConv) {
+          if (lastConv && lastConv.id) {
             const convResponse = await fetch(`/api/conversations/${lastConv.id}`)
             if (convResponse.ok) {
               const convData = await convResponse.json()
-              setConversationId(lastConv.id)
-              setMessages(
-                convData.messages.map((m: any) => ({
-                  id: m.id,
-                  role: m.role,
-                  content: m.content,
-                  created_at: m.created_at,
-                  reactions: m.reactions,
-                }))
-              )
+              if (convData.messages && convData.messages.length > 0) {
+                setConversationId(lastConv.id)
+                setMessages(
+                  convData.messages.map((m: any) => ({
+                    id: m.id,
+                    role: m.role,
+                    content: m.content,
+                    created_at: m.created_at,
+                    reactions: m.reactions || null,
+                  }))
+                )
+                // Update URL to include conversation ID
+                window.history.replaceState({}, '', `/chat?conversation=${lastConv.id}`)
+              }
+            } else {
+              console.error('Failed to load conversation details:', await convResponse.text())
             }
           }
+        } else {
+          console.error('Failed to load conversations:', await response.text())
         }
       } catch (error) {
         console.error('Error loading last conversation:', error)
@@ -209,20 +217,28 @@ export default function ChatPage() {
             const convResponse = await fetch(`/api/conversations/${finalConvId}`)
             if (convResponse.ok) {
               const convData = await convResponse.json()
-              setMessages(
-                convData.messages.map((m: any) => ({
-                  id: m.id,
-                  role: m.role,
-                  content: m.content,
-                  created_at: m.created_at,
-                  reactions: m.reactions || null,
-                }))
-              )
+              if (convData.messages && convData.messages.length > 0) {
+                setMessages(
+                  convData.messages.map((m: any) => ({
+                    id: m.id,
+                    role: m.role,
+                    content: m.content,
+                    created_at: m.created_at,
+                    reactions: m.reactions || null,
+                  }))
+                )
+              } else {
+                console.warn('No messages found in conversation:', finalConvId)
+              }
+            } else {
+              console.error('Failed to reload messages:', await convResponse.text())
             }
           } catch (error) {
             console.error('Error reloading messages:', error)
           }
-        }, 1000) // Increased delay to ensure message is saved
+        }, 1500) // Increased delay to ensure message is saved
+      } else if (!finalConvId) {
+        console.warn('No conversation ID received from API')
       }
 
       if (!response.ok) {
@@ -377,14 +393,17 @@ export default function ChatPage() {
     }
   }
 
+  // Limit visible messages to last 200 to keep mobile smooth
+  const visibleMessages = messages.slice(-200)
+
   // Group messages by date for date separators
   const groupedMessages = (() => {
     const groups: Array<{ date: string; messages: Message[] }> = []
     let currentGroup: { date: string; messages: Message[] } | null = null
 
-    messages.forEach((message, index) => {
+    visibleMessages.forEach((message, index) => {
       const messageDate = message.created_at
-      const prevMessage = index > 0 ? messages[index - 1] : null
+      const prevMessage = index > 0 ? visibleMessages[index - 1] : null
 
       // Check if we need a new date group
       if (!prevMessage || !isSameDay(prevMessage.created_at, messageDate)) {

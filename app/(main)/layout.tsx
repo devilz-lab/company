@@ -7,7 +7,7 @@ export default function MainLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex flex-col min-h-screen bg-[#0a0a0a] pb-16">
+    <div className="flex flex-col min-h-screen bg-[#0a0a0a] pb-24">
       <div className="sticky top-0 z-40 bg-[#0a0a0a] border-b border-[#2a2a2a] p-4">
         <SearchBar />
       </div>
