@@ -38,24 +38,18 @@ export function MessageReactions({ messageId, reactions, onReaction }: MessageRe
   }
 
   // Separate icon reactions and emoji reactions
-  // Handle both boolean (old format) and number (new format) reactions
-  const iconReactions = reactions
+  // Reactions are now always numbers (counts)
+  const iconReactions: Array<[string, number]> = reactions
     ? Object.entries(reactions)
         .filter(([reaction]) => !isEmoji(reaction))
-        .filter(([, count]) => {
-          // Show if count is truthy (boolean true or number > 0)
-          return count === true || (typeof count === 'number' && count > 0)
-        })
-        .map(([reaction, count]) => [reaction, typeof count === 'number' ? count : 1])
+        .filter(([, count]) => typeof count === 'number' && count > 0)
+        .map(([reaction, count]) => [reaction, count as number])
     : []
-  const emojiReactions = reactions
+  const emojiReactions: Array<[string, number]> = reactions
     ? Object.entries(reactions)
         .filter(([reaction]) => isEmoji(reaction))
-        .filter(([, count]) => {
-          // Show if count is truthy (boolean true or number > 0)
-          return count === true || (typeof count === 'number' && count > 0)
-        })
-        .map(([reaction, count]) => [reaction, typeof count === 'number' ? count : 1])
+        .filter(([, count]) => typeof count === 'number' && count > 0)
+        .map(([reaction, count]) => [reaction, count as number])
     : []
 
   return (

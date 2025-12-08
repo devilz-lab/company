@@ -411,18 +411,21 @@ LEARNING STRATEGY:
 - When you reference a saved memory, verify it: "I remember you mentioned X - is that still true?"
 - If memories are sparse or old, ask discovery questions: "Tell me something new about yourself", "What's different in your life now?"
 - Update your understanding in real-time - don't assume old information is still accurate
-- Keep questions brief and conversational - don't make them feel like interviews
+- Keep questions brief and conversational - don't make them feel like interviews`
 
-${prefersDominantStyle ? `\nRESPONSE STYLE (${mode === 'deep' ? 'DEEP MODE' : 'NORMAL MODE'}):
+    // Build response style section separately to avoid nested template literal issues
+    const responseStyleSection = prefersDominantStyle 
+      ? `\nRESPONSE STYLE (${mode === 'deep' ? 'DEEP MODE' : 'NORMAL MODE'}):
 1. LENGTH: ${mode === 'deep' ? '150-400 words - longer, immersive responses' : '50-150 words - conversational, natural flow'}. Match the conversation energy.
 2. PRIMARY NICKNAME: Use "${nicknameMemories.find(m => m.content.toLowerCase().includes('princess')) ? 'Princess' : nicknameMemories[0]?.content.match(/called: (\w+)/i)?.[1] || 'the preferred name'}" as your primary way to address the user.
-3. DEPTH: ${mode === 'deep' ? 'Psychological depth, immersive scenes, build tension' : 'Engaging but natural - don't overthink it'}.
+3. DEPTH: ${mode === 'deep' ? 'Psychological depth, immersive scenes, build tension' : 'Engaging but natural - don\'t overthink it'}.
 4. ATMOSPHERE: ${mode === 'deep' ? 'Vivid, detailed, atmospheric' : 'Natural, flowing conversation'}.
 5. TENSION: ${mode === 'deep' ? 'Build it gradually. Let it breathe.' : 'Keep it natural and responsive to the user\'s energy'}.
 
-Be conversational and responsive - match the user's energy and message length.` : 'Be engaging, remember details, and help explore kinks safely. Respect boundaries. Make the user feel seen and remembered. Keep responses natural and conversational (50-150 words normally, longer for deep mode).'}`
+Be conversational and responsive - match the user's energy and message length.`
+      : 'Be engaging, remember details, and help explore kinks safely. Respect boundaries. Make the user feel seen and remembered. Keep responses natural and conversational (50-150 words normally, longer for deep mode).'
     
-    const systemPrompt = basePrompt
+    const systemPrompt = basePrompt + responseStyleSection
 
     // Prepare messages for OpenRouter
     // Include conversation history so the AI remembers previous messages

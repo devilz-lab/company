@@ -687,7 +687,12 @@ export default function ChatPage() {
                             <VoicePlayer text={message.content} />
                             <MessageReactions
                               messageId={message.id}
-                              reactions={message.reactions || null}
+                              reactions={message.reactions ? Object.fromEntries(
+                                Object.entries(message.reactions).map(([key, value]) => [
+                                  key,
+                                  typeof value === 'number' ? value : (value ? 1 : 0)
+                                ])
+                              ) : null}
                               onReaction={async (msgId, reaction) => {
                                 // Toggle reaction with count
                                 const currentReactions = messages.find(m => m.id === msgId)?.reactions || {}
