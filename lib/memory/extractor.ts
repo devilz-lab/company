@@ -176,6 +176,7 @@ export function extractMemories(
     })
 
     // ========== 2. PREFERENCES (Consolidate, avoid duplicates) ==========
+    const content = msg.content.toLowerCase()
     if (content.match(/\b(i like|i love|i enjoy|i prefer|i'm into|i'm a fan of|i appreciate|i want|i need|i crave)\b/i)) {
       const preferenceMatch = msg.content.match(/\b(i like|i love|i enjoy|i prefer|i'm into|i'm a fan of|i appreciate|i want|i need|i crave)\s+(.+?)(?:\.|$|,)/i)
       const preference = preferenceMatch ? preferenceMatch[2].trim() : msg.content
