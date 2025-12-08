@@ -64,6 +64,13 @@ export default function ChatPage() {
   // Load conversation from URL or continue last conversation
   useEffect(() => {
     const loadConversation = async () => {
+      // Wait for personas to load first
+      if (personas.length === 0) {
+        // Retry after a short delay if personas aren't loaded yet
+        setTimeout(() => loadConversation(), 100)
+        return
+      }
+
       // Check URL for conversation ID
       const urlParams = new URLSearchParams(window.location.search)
       const convIdFromUrl = urlParams.get('conversation')
@@ -75,6 +82,12 @@ export default function ChatPage() {
           if (response.ok) {
             const data = await response.json()
             setConversationId(convIdFromUrl)
+            // Set persona ID from conversation
+            if (data.conversation?.persona_id) {
+              setSelectedPersonaId(data.conversation.persona_id)
+            } else {
+              setSelectedPersonaId(null)
+            }
             setMessages(
               data.messages.map((m: any) => ({
                 id: m.id,
@@ -91,9 +104,11 @@ export default function ChatPage() {
         }
       }
 
-      // Otherwise, try to load last conversation
+      // Otherwise, try to load last conversation for the selected persona
+      // If no persona selected, load last conversation (any persona or shared)
       try {
-        const response = await fetch('/api/conversations?archived=false&limit=1')
+        const personaFilter = selectedPersonaId ? `&personaId=${selectedPersonaId}` : ''
+        const response = await fetch(`/api/conversations?archived=false&limit=1${personaFilter}`)
         if (response.ok) {
           const data = await response.json()
           const lastConv = data.conversations?.[0]
@@ -103,6 +118,12 @@ export default function ChatPage() {
               const convData = await convResponse.json()
               if (convData.messages && convData.messages.length > 0) {
                 setConversationId(lastConv.id)
+                // Set persona ID from conversation
+                if (convData.conversation?.persona_id) {
+                  setSelectedPersonaId(convData.conversation.persona_id)
+                } else {
+                  setSelectedPersonaId(null)
+                }
                 setMessages(
                   convData.messages.map((m: any) => ({
                     id: m.id,
@@ -128,7 +149,7 @@ export default function ChatPage() {
     }
 
     loadConversation()
-  }, [])
+  }, [personas, selectedPersonaId])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -207,48 +228,22 @@ export default function ChatPage() {
         window.history.replaceState({}, '', `/chat?conversation=${convIdFromHeader}`)
       }
 
-      // Reload messages after streaming completes to get saved messages with proper IDs
-      // This ensures we have the correct message IDs for reactions and history
-      const finalConvId = convIdFromHeader || conversationId
-      if (finalConvId && response.ok) {
-        // Wait a bit longer for the message to be saved
-        setTimeout(async () => {
-          try {
-            const convResponse = await fetch(`/api/conversations/${finalConvId}`)
-            if (convResponse.ok) {
-              const convData = await convResponse.json()
-              if (convData.messages && convData.messages.length > 0) {
-                setMessages(
-                  convData.messages.map((m: any) => ({
-                    id: m.id,
-                    role: m.role,
-                    content: m.content,
-                    created_at: m.created_at,
-                    reactions: m.reactions || null,
-                  }))
-                )
-              } else {
-                console.warn('No messages found in conversation:', finalConvId)
-              }
-            } else {
-              console.error('Failed to reload messages:', await convResponse.text())
-            }
-          } catch (error) {
-            console.error('Error reloading messages:', error)
-          }
-        }, 1500) // Increased delay to ensure message is saved
-      } else if (!finalConvId) {
-        console.warn('No conversation ID received from API')
-      }
-
       if (!response.ok) {
         const errorText = await response.text()
         throw new Error(`API error: ${errorText}`)
       }
 
+      // Get conversation ID from response headers
+      const convIdFromHeader = response.headers.get('X-Conversation-Id')
+      if (convIdFromHeader && !conversationId) {
+        setConversationId(convIdFromHeader)
+        window.history.replaceState({}, '', `/chat?conversation=${convIdFromHeader}`)
+      }
+
       const reader = response.body?.getReader()
       const decoder = new TextDecoder()
       let assistantMessage = ''
+      const finalConvId = convIdFromHeader || conversationId
 
       if (reader) {
         while (true) {
@@ -289,6 +284,43 @@ export default function ChatPage() {
               }
             }
           }
+        }
+
+        // Reload messages AFTER streaming completes to get saved messages with proper IDs
+        // This ensures we have the correct message IDs for reactions and history
+        if (finalConvId && assistantMessage) {
+          // Wait for message to be saved to database
+          setTimeout(async () => {
+            try {
+              const convResponse = await fetch(`/api/conversations/${finalConvId}`)
+              if (convResponse.ok) {
+                const convData = await convResponse.json()
+                if (convData.messages && convData.messages.length > 0) {
+                  // Only update if we have more messages than current (message was saved)
+                  // This prevents clearing messages if DB hasn't saved yet
+                  setMessages((prev) => {
+                    const dbMessages = convData.messages.map((m: any) => ({
+                      id: m.id,
+                      role: m.role,
+                      content: m.content,
+                      created_at: m.created_at,
+                      reactions: m.reactions || null,
+                    }))
+                    
+                    // If DB has more messages, use DB (includes saved assistant message)
+                    // Otherwise keep current state (streaming message might not be saved yet)
+                    if (dbMessages.length >= prev.length) {
+                      return dbMessages
+                    }
+                    return prev
+                  })
+                }
+              }
+            } catch (error) {
+              console.error('Error reloading messages:', error)
+              // Don't clear messages on error - keep what we have
+            }
+          }, 2000) // Wait 2 seconds after streaming completes
         }
       }
     } catch (error) {
