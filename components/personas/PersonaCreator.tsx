@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { X, Plus } from 'lucide-react'
-import { PersonaCreate } from '@/types/persona'
+import { Persona, PersonaCreate } from '@/types/persona'
 import { Avatar } from './Avatar'
 
 interface PersonaCreatorProps {
