@@ -467,15 +467,18 @@ If you write a short response, you are not meeting the requirements. Expand. Ela
               const memoryToUpdate = usedHappyMemory || recentHappyMemories[0]
               
               if (memoryToUpdate) {
-                await supabase
-                  .from('memories')
-                  .update({
-                    last_accessed: new Date().toISOString(),
-                    access_count: (memoryToUpdate.access_count || 0) + 1,
-                    strength: Math.min((memoryToUpdate.strength || 1.0) + 0.05, 1.0),
-                  })
-                  .eq('id', memoryToUpdate.id)
-                  .catch(err => console.error('Error updating happy memory access:', err))
+                try {
+                  await supabase
+                    .from('memories')
+                    .update({
+                      last_accessed: new Date().toISOString(),
+                      access_count: (memoryToUpdate.access_count || 0) + 1,
+                      strength: Math.min((memoryToUpdate.strength || 1.0) + 0.05, 1.0),
+                    })
+                    .eq('id', memoryToUpdate.id)
+                } catch (err) {
+                  console.error('Error updating happy memory access:', err)
+                }
               }
             }
 
