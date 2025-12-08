@@ -88,13 +88,13 @@ export async function POST(req: NextRequest) {
       console.error('Error fetching conversation history:', historyError)
     }
 
-    // Get relevant memories - prioritize importance first, then strength
-    // If personaId is set, get persona-specific memories + shared memories (persona_id = null)
-    // If personaId is null, only get shared memories
-    let memoryQuery = supabase
-      .from('memories')
-      .select('id, content, importance, memory_type, created_at, last_accessed, access_count, persona_id')
-      .eq('user_id', userId)
+        // Get relevant memories - prioritize importance first, then strength
+        // If personaId is set, get persona-specific memories + shared memories (persona_id = null)
+        // If personaId is null, only get shared memories
+        let memoryQuery = supabase
+          .from('memories')
+          .select('id, content, importance, memory_type, created_at, last_accessed, access_count, persona_id, strength')
+          .eq('user_id', userId)
     
     if (activePersonaId) {
       // Get persona-specific memories AND shared memories (persona_id = null)
