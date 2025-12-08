@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
         // If personaId is null, only get shared memories
         let memoryQuery = supabase
           .from('memories')
-          .select('id, content, importance, memory_type, created_at, last_accessed, access_count, persona_id, strength')
+          .select('id, user_id, content, importance, memory_type, created_at, last_accessed, access_count, persona_id, strength, context')
           .eq('user_id', userId)
     
     if (activePersonaId) {
