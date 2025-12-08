@@ -41,7 +41,7 @@ export async function chatWithOpenRouter(
       messages,
       stream,
       temperature: 0.85, // Slightly higher for more creative, varied responses
-      max_tokens: 4000, // Increased for longer, more detailed responses
+      max_tokens: 2000, // Enough for detailed responses but prevents excessive length
       top_p: 0.9, // Nucleus sampling for better quality
       frequency_penalty: 0.3, // Reduce repetition of words/phrases
       presence_penalty: 0.2, // Encourage exploring new topics
