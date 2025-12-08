@@ -61,9 +61,10 @@ export async function POST(req: NextRequest) {
     if (error) throw error
 
     return Response.json({ persona })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Create persona error:', error)
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+    const errorMessage = error?.message || 'Internal server error'
+    return new Response(JSON.stringify({ error: errorMessage, details: error }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     })

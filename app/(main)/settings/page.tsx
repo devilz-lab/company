@@ -1,10 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { LanguageSelector } from '@/components/i18n/LanguageSelector'
 import { Language } from '@/lib/i18n/translator'
+import { Upload } from 'lucide-react'
 
 export default function SettingsPage() {
+  const router = useRouter()
   const [language, setLanguage] = useState<Language>('en')
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
   const [proactiveMessagesEnabled, setProactiveMessagesEnabled] = useState(true)
@@ -85,6 +88,21 @@ export default function SettingsPage() {
               className="w-5 h-5 rounded bg-[#2a2a2a] border-[#3a3a3a] text-[#3a3a3a] focus:ring-[#3a3a3a]"
             />
           </label>
+        </div>
+
+        {/* Import Conversation */}
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
+          <h3 className="text-lg font-semibold text-[#ededed] mb-3">Import Conversation</h3>
+          <p className="text-sm text-[#888] mb-3">
+            Import a conversation from Grok or another chat to extract nicknames, preferences, and relationship patterns.
+          </p>
+          <button
+            onClick={() => router.push('/settings/import')}
+            className="w-full bg-[#3a3a3a] hover:bg-[#4a4a4a] text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+          >
+            <Upload className="w-4 h-4" />
+            Import Conversation
+          </button>
         </div>
 
         {/* API Keys Info */}

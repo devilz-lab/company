@@ -1,4 +1,4 @@
-export type ConversationMode = 'quick' | 'deep' | 'roleplay' | 'advice'
+export type ConversationMode = 'quick' | 'deep' | 'roleplay' | 'advice' | 'dominant'
 
 export interface Message {
   id: string

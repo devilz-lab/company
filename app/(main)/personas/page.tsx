@@ -46,15 +46,35 @@ export default function PersonasPage() {
 
   const handleCreate = async (personaData: PersonaCreate) => {
     try {
+      console.log('Creating persona with data:', personaData)
       const response = await fetch('/api/personas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(personaData),
       })
-      if (!response.ok) throw new Error('Failed to create persona')
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('API Error Response:', response.status, errorText)
+        let errorMessage = 'Failed to create persona'
+        try {
+          const errorJson = JSON.parse(errorText)
+          errorMessage = errorJson.error || errorMessage
+        } catch {
+          errorMessage = errorText || errorMessage
+        }
+        alert(`Error: ${errorMessage}\n\nCheck browser console for details.`)
+        throw new Error(errorMessage)
+      }
+      
+      const data = await response.json()
+      console.log('Persona created successfully:', data)
       await loadPersonas()
     } catch (error) {
       console.error('Error creating persona:', error)
+      if (!(error instanceof Error && error.message.includes('Error:'))) {
+        alert(`Error creating persona: ${error instanceof Error ? error.message : 'Unknown error'}\n\nCheck browser console for details.`)
+      }
       throw error
     }
   }

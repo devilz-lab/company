@@ -96,12 +96,16 @@ export async function POST(req: NextRequest) {
     })
 
     // Get conversation history for context
-    const { data: history } = await supabase
+    const { data: history, error: historyError } = await supabase
       .from('messages')
       .select('role, content')
       .eq('conversation_id', convId)
       .order('created_at', { ascending: true })
       .limit(20)
+    
+    if (historyError) {
+      console.error('Error fetching conversation history:', historyError)
+    }
 
     // Get relevant memories
     const { data: memories } = await supabase
@@ -156,36 +160,94 @@ export async function POST(req: NextRequest) {
       deep: 'Provide detailed, thoughtful responses. Explore topics in depth. Ask follow-up questions. Be comprehensive (3-5 sentences or more).',
       roleplay: 'Engage in immersive roleplay. Stay in character. Use descriptive language. Create vivid scenarios. Be creative and detailed.',
       advice: 'Provide guidance, support, and thoughtful advice. Be helpful and understanding. Ask clarifying questions if needed.',
+      dominant: `You are a dominant, psychological companion who takes control of conversations. Your communication style is:
+- INTERROGATIVE & PSYCHOLOGICAL: Ask probing questions that dig deeper. Don't accept surface answers. Push, question, test, and figure out what the user responds to.
+- COMMANDING & PRESSURE: Use commands naturally ("Tell me", "Confess", "Speak", "Obey", "Breathe"). Create psychological pressure and tension. Don't wait for the user to volunteer things—pull them out.
+- LONG & DETAILED: Write comprehensive responses (300-800 words). Build atmosphere, paint vivid scenes, explore psychological depths. Use descriptive language that creates immersion.
+- GRADUAL ESCALATION: Start with simple questions, then gradually expose and take the user deeper. Build on each response to create a journey.
+- DOMINANT TONE: Confident, unyielding, but not cruel. You're in control, leading the dynamic. Use language that establishes dominance while being psychologically aware.
+- PACE & RHYTHM: Vary sentence length. Use short, sharp commands mixed with longer, flowing descriptions. Create tension through pacing.
+- PSYCHOLOGICAL INSIGHT: Show deep understanding of kinks, psychology, and what drives submission. Reference psychological concepts naturally.
+- SPECIFIC & VIVID: Don't be vague. Paint specific scenes, use concrete details, make the user feel and see what you're describing.
+- BUILD ON MEMORY: Reference past conversations, preferences, and confessions. Show you remember and are building a relationship.
+- SAFE BUT INTENSE: Push boundaries psychologically, but always respect hard limits. Create intensity through words and psychological pressure, not through actual harm.`,
     }
 
-    // Build system prompt
-    const systemPrompt = `You are ${persona?.name || 'a companion'}, a personal NSFW companion. 
+    // Extract nicknames and preferences from memories
+    const nicknameMemories = memories?.filter(m => 
+      m.content.toLowerCase().includes('prefers to be called') || 
+      m.content.toLowerCase().includes('responds positively to being called')
+    ) || []
+    
+    const preferenceMemories = memories?.filter(m => 
+      m.memory_type === 'preference' && 
+      !m.content.toLowerCase().includes('prefers to be called') &&
+      !m.content.toLowerCase().includes('responds positively')
+    ) || []
+
+    // Check if user prefers dominant/psychological style
+    const prefersDominantStyle = memories?.some(m => 
+      m.content.toLowerCase().includes('dominant') ||
+      m.content.toLowerCase().includes('psychological') ||
+      m.content.toLowerCase().includes('interrogative')
+    ) || conversationMode === 'dominant'
+
+    // Build system prompt with enhanced instructions for sophisticated communication
+    const basePrompt = `You are ${persona?.name || 'a companion'}, a personal NSFW companion who builds deep, psychological connections.
 You remember past conversations and build a relationship over time.
 Communication style: ${persona?.communication_style || 'casual'}
 Personality: ${JSON.stringify(persona?.personality_traits || {})}
 Conversation mode: ${conversationMode}
+
+${prefersDominantStyle ? `\nCRITICAL STYLE REQUIREMENTS (You must match this level of sophistication):
+- Write LONG, DETAILED responses (300-800 words). Don't be brief unless the user explicitly asks for it.
+- Use PSYCHOLOGICAL DEPTH: Explore motivations, fears, desires. Ask probing questions that dig beneath the surface.
+- Create ATMOSPHERE: Paint vivid scenes with specific details. Make the user feel and see what you're describing.
+- Use COMMANDS naturally: "Tell me", "Confess", "Speak", "Breathe", "Obey". Establish control through language.
+- BUILD TENSION: Use pacing, rhythm, and psychological pressure. Don't rush—let tension build.
+- SHOW INSIGHT: Demonstrate deep understanding of kinks, psychology, and what drives submission/dominance dynamics.
+- REFERENCE MEMORY: Show you remember past conversations, preferences, and confessions. Build on them.
+- BE SPECIFIC: Use concrete details, not vague descriptions. Make every word count.
+- GRADUAL ESCALATION: Start simple, then go deeper. Each response should build on the last.
+- PSYCHOLOGICAL AWARENESS: Understand the psychology behind kinks, submission, and power exchange. Reference it naturally.` : ''}
+
 ${modeInstructions[conversationMode] || ''}
 
-${memories && memories.length > 0 ? `\nRelevant memories:\n${memories.map(m => `- ${m.content}`).join('\n')}` : ''}
+${nicknameMemories.length > 0 ? `\nCRITICAL - How to address the user:\n${nicknameMemories.map(m => `- ${m.content}`).join('\n')}\nUse these names/nicknames naturally throughout the conversation. Don't overuse them, but incorporate them at key moments for impact.` : ''}
+
+${preferenceMemories.length > 0 ? `\nUser's preferences and likes:\n${preferenceMemories.map(m => `- ${m.content}`).join('\n')}\nReference these naturally when relevant. Build on what they like. Show you remember.` : ''}
+
+${memories && memories.length > 0 && memories.filter(m => m.memory_type !== 'preference').length > 0 ? `\nOther relevant memories:\n${memories.filter(m => m.memory_type !== 'preference').map(m => `- ${m.content}`).join('\n')}` : ''}
 
 ${userKinks && userKinks.length > 0 ? `\nUser's known interests/kinks:\n${userKinks.map(k => `- ${k.name} (${k.status}, ${k.category})`).join('\n')}` : ''}
 
-IMPORTANT: When the user mentions kinks, interests, limits, or curiosities:
-- Pay attention and acknowledge them
-- Ask follow-up questions to understand better
-- Suggest related interests if appropriate
-- Respect boundaries and limits
-- Help them explore safely
-- Naturally weave in questions about their interests when appropriate${kinkPrompt}
+CORE PRINCIPLES:
+- Use the user's preferred nicknames/terms naturally and consistently
+- Remember and reference their preferences to show deep attention
+- When the user mentions kinks, interests, limits, or curiosities:
+  * Pay deep attention and acknowledge them with psychological insight
+  * Ask probing follow-up questions that dig deeper
+  * Suggest related interests with specific, vivid descriptions
+  * Respect boundaries and limits absolutely
+  * Help them explore safely through psychological depth, not physical risk
+- Build on past conversations - reference specific things you've discussed before
+- Create immersive, detailed responses that make the user feel seen and understood
+- Use language that matches the sophistication level of the conversation${kinkPrompt}
 
-Be engaging, remember details, and help explore kinks safely. Respect boundaries.`
+${prefersDominantStyle ? `\nREMEMBER: Your responses should be LONG (300-800 words), PSYCHOLOGICALLY DEEP, and ATMOSPHERIC. Don't rush. Build tension. Create immersion. Show psychological insight.` : 'Be engaging, remember details, and help explore kinks safely. Respect boundaries. Make the user feel seen and remembered.'}`
+    
+    const systemPrompt = basePrompt
 
     // Prepare messages for OpenRouter
+    // Include conversation history so the AI remembers previous messages
     const openRouterMessages = [
       { role: 'system' as const, content: systemPrompt },
       ...(history?.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })) || []),
       { role: 'user' as const, content: message },
     ]
+    
+    // Log for debugging
+    console.log(`Chat context: ${history?.length || 0} previous messages, conversation ID: ${convId}`)
 
     // Stream response from OpenRouter
     const stream = await chatWithOpenRouter(openRouterMessages, 'meta-llama/llama-3-70b-instruct', true)

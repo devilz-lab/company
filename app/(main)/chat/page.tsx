@@ -138,6 +138,28 @@ export default function ChatPage() {
             window.history.replaceState({}, '', `/chat?conversation=${newConv.id}`)
           }
         }
+      } else if (conversationId && response.ok) {
+        // Reload messages after sending to get the saved assistant message with proper ID
+        // This ensures we have the correct message IDs for reactions
+        setTimeout(async () => {
+          try {
+            const convResponse = await fetch(`/api/conversations/${conversationId}`)
+            if (convResponse.ok) {
+              const convData = await convResponse.json()
+              setMessages(
+                convData.messages.map((m: any) => ({
+                  id: m.id,
+                  role: m.role,
+                  content: m.content,
+                  created_at: m.created_at,
+                  reactions: m.reactions || null,
+                }))
+              )
+            }
+          } catch (error) {
+            console.error('Error reloading messages:', error)
+          }
+        }, 500)
       }
 
       if (!response.ok) {

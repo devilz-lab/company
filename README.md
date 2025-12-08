@@ -14,7 +14,7 @@ A personal NSFW companion app with memory, multiple personas, and relationship b
 - 📱 **Mobile-First** - Optimized for mobile devices
 - 🌙 **Dark Mode** - Default dark theme
 
-## Setup
+## Quick Start
 
 ### 1. Install Dependencies
 
@@ -27,23 +27,34 @@ npm install
 Create a `.env.local` file in the root directory:
 
 ```env
-# Supabase
+# Supabase (Required)
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url_here
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 
-# OpenRouter
+# OpenRouter (Required)
 OPENROUTER_API_KEY=your_openrouter_api_key_here
 
 # App
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Optional: Text-to-Speech
+ELEVENLABS_API_KEY=your_key_here
+
+# Optional: Image Generation
+STABILITY_AI_API_KEY=your_key_here
 ```
 
 ### 3. Database Setup
 
-1. Go to your Supabase project
-2. Navigate to SQL Editor
-3. Run the migration file: `supabase/migrations/001_initial_schema.sql`
+1. Go to your Supabase project SQL Editor
+2. Run the migration: `supabase/migrations/001_initial_schema.sql`
+3. Create default user:
+```sql
+INSERT INTO users (id, email) 
+VALUES ('00000000-0000-0000-0000-000000000001', 'your-email@example.com')
+ON CONFLICT (id) DO NOTHING;
+```
 
 ### 4. Run Development Server
 
@@ -52,6 +63,10 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## 📖 User Guide
+
+See [USER_GUIDE.md](./USER_GUIDE.md) for detailed usage instructions.
 
 ## Project Structure
 

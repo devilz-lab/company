@@ -16,17 +16,48 @@ export function extractMemories(
   userMessages.forEach((msg, idx) => {
     const content = msg.content.toLowerCase()
 
-    // Preference patterns
-    if (content.match(/\b(i like|i love|i enjoy|i prefer|i'm into)\b/i)) {
+    // Nickname patterns - capture what the user likes to be called
+    const nicknamePatterns = [
+      /\b(call me|you can call me|i like being called|i prefer|nickname is|just call me)\s+([a-z]+)/i,
+      /\b(i'm|i am)\s+([a-z]+)\s+(to you|for you)/i,
+      /\b(refer to me as|address me as)\s+([a-z]+)/i,
+    ]
+    
+    nicknamePatterns.forEach(pattern => {
+      const match = msg.content.match(pattern)
+      if (match) {
+        const nickname = match[2] || match[1]
+        memories.push({
+          id: `nickname-${Date.now()}-${idx}`,
+          user_id: userId,
+          persona_id: personaId,
+          memory_type: 'preference',
+          content: `User prefers to be called: ${nickname}. Use this naturally in conversations.`,
+          importance: 9, // Very important - personal identity
+          strength: 1.0,
+          context: { conversation_index: idx, extracted_nickname: nickname },
+          created_at: new Date().toISOString(),
+          last_accessed: null,
+          access_count: 0,
+        })
+      }
+    })
+
+    // Preference patterns - what user likes/enjoys
+    if (content.match(/\b(i like|i love|i enjoy|i prefer|i'm into|i'm a fan of|i appreciate)\b/i)) {
+      // Extract the actual preference
+      const preferenceMatch = msg.content.match(/\b(i like|i love|i enjoy|i prefer|i'm into|i'm a fan of|i appreciate)\s+(.+?)(?:\.|$|,)/i)
+      const preference = preferenceMatch ? preferenceMatch[2].trim() : msg.content
+      
       memories.push({
         id: `pref-${Date.now()}-${idx}`,
         user_id: userId,
         persona_id: personaId,
         memory_type: 'preference',
-        content: msg.content,
-        importance: 7,
+        content: `User likes/prefers: ${preference}`,
+        importance: 8,
         strength: 1.0,
-        context: { conversation_index: idx },
+        context: { conversation_index: idx, original_message: msg.content },
         created_at: new Date().toISOString(),
         last_accessed: null,
         access_count: 0,
@@ -51,7 +82,7 @@ export function extractMemories(
     }
 
     // Personal facts
-    if (content.match(/\b(my name is|i'm|i am|i work|i live)\b/i)) {
+    if (content.match(/\b(my name is|i'm|i am|i work|i live|i'm from)\b/i)) {
       memories.push({
         id: `fact-${Date.now()}-${idx}`,
         user_id: userId,
@@ -61,6 +92,64 @@ export function extractMemories(
         importance: 8,
         strength: 1.0,
         context: { conversation_index: idx },
+        created_at: new Date().toISOString(),
+        last_accessed: null,
+        access_count: 0,
+      })
+    }
+
+    // Relationship patterns - how companion addresses user
+    // Extract from assistant messages what terms they use that user responds to
+    assistantMessages.forEach((assistantMsg, aIdx) => {
+      const assContent = assistantMsg.content.toLowerCase()
+      
+      // Extract terms of endearment/nicknames the companion uses
+      const endearmentPatterns = [
+        /\b(princess|pet|babygirl|sissy|sweetheart|baby|honey|darling|love|dear|babe|sugar|good girl|my little|my sweet)\b/gi,
+      ]
+      
+      endearmentPatterns.forEach(pattern => {
+        const matches = assistantMsg.content.matchAll(pattern)
+        for (const match of matches) {
+          const term = match[1] || match[0]
+          // Check if user responded positively to this message
+          const nextUserMsg = userMessages.find((_, uIdx) => uIdx > idx)
+          const respondedPositively = nextUserMsg?.content.match(/\b(yes|love|like|thanks|thank you|good|perfect|mistress|ma'am|mommy|goddess)\b/i)
+          
+          if (respondedPositively || term.toLowerCase().includes('princess') || term.toLowerCase().includes('pet')) {
+            memories.push({
+              id: `endearment-${Date.now()}-${idx}-${aIdx}-${term}`,
+              user_id: userId,
+              persona_id: personaId,
+              memory_type: 'preference',
+              content: `User responds positively to being called: ${term}. Use this naturally in conversations.`,
+              importance: 9, // Nicknames are very important
+              strength: 1.0,
+              context: { conversation_index: idx, term_of_endearment: term },
+              created_at: new Date().toISOString(),
+              last_accessed: null,
+              access_count: 0,
+            })
+          }
+        }
+      })
+    })
+
+    // Extract communication style preferences from assistant messages
+    // Look for dominant, psychological, interrogative patterns
+    if (assistantMessages.some(m => 
+      m.content.match(/\b(tell me|confess|obey|speak|answer|breathe|kneel|good girl|pet|princess)\b/i) ||
+      m.content.length > 500 // Long, detailed responses
+    )) {
+      memories.push({
+        id: `style-${Date.now()}`,
+        user_id: userId,
+        persona_id: personaId,
+        memory_type: 'preference',
+        content: 'User prefers dominant, psychological, interrogative communication style with detailed responses. Use commands, questions, and build psychological tension.',
+        importance: 8,
+        strength: 1.0,
+        context: {},
         created_at: new Date().toISOString(),
         last_accessed: null,
         access_count: 0,

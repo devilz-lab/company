@@ -36,8 +36,9 @@ export async function chatWithOpenRouter(
       model,
       messages,
       stream,
-      temperature: 0.8,
-      max_tokens: 2000,
+      temperature: 0.85, // Slightly higher for more creative, varied responses
+      max_tokens: 4000, // Increased for longer, more detailed responses
+      top_p: 0.9, // Nucleus sampling for better quality
     }),
   })
 

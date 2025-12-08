@@ -12,13 +12,13 @@ export async function retrieveMemories(
 ): Promise<Memory[]> {
   const supabase = createClient()
 
-  // Build query
+  // Build query - prioritize nickname and preference memories
   let query = supabase
     .from('memories')
     .select('*')
     .eq('user_id', userId)
+    .order('importance', { ascending: false }) // Importance first (nicknames are 9, preferences are 8)
     .order('strength', { ascending: false })
-    .order('importance', { ascending: false })
     .limit(limit)
 
   // Filter by persona if specified

@@ -1,7 +1,7 @@
 'use client'
 
 import { ConversationMode } from '@/types/chat'
-import { Zap, MessageSquare, Theater, Lightbulb } from 'lucide-react'
+import { Zap, MessageSquare, Theater, Lightbulb, Crown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ConversationModeSelectorProps {
@@ -38,6 +38,12 @@ const modes: Array<{
     label: 'Advice',
     icon: Lightbulb,
     description: 'Guidance and support',
+  },
+  {
+    value: 'dominant',
+    label: 'Dominant',
+    icon: Crown,
+    description: 'Psychological, commanding, detailed',
   },
 ]
 
