@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { extractMemories } from '@/lib/memory/extractor'
 import { getUserId } from '@/lib/auth/get-user'
+import { Memory } from '@/types/memory'
 
 /**
  * Import and analyze example conversations to extract patterns
@@ -21,57 +22,70 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient()
     const userId = await getUserId()
 
+    // Get existing memories to pass to extractor
+    const { data: existingMemoriesData } = await supabase
+      .from('memories')
+      .select('id, content, memory_type, persona_id, user_id, importance, strength, context, created_at, last_accessed, access_count')
+      .eq('user_id', userId)
+    
+    const existingMemories = (existingMemoriesData || []) as Memory[]
+
     // Extract memories from the imported conversation
     console.log('Extracting memories...')
-    const extractedMemories = extractMemories(messages, userId, personaId || null)
-    console.log(`Extracted ${extractedMemories.length} memories`)
+    const extractionResult = extractMemories(messages, userId, personaId || null, existingMemories)
+    console.log(`Extracted ${extractionResult.newMemories.length} new memories, ${extractionResult.memoryUpdates.length} updates`)
 
-    if (extractedMemories.length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: 'No memories extracted from conversation',
-          memories: []
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    const { updateMemoryFromConversation } = await import('@/lib/memory/updater')
+
+    // Apply memory updates
+    if (extractionResult.memoryUpdates.length > 0) {
+      console.log('Applying memory updates...')
+      for (const update of extractionResult.memoryUpdates) {
+        try {
+          await updateMemoryFromConversation(update.memoryId, update.newContent, userId)
+        } catch (err) {
+          console.error('Error updating memory:', err)
+        }
+      }
     }
 
-    // Save extracted memories in batches to avoid timeout
-    console.log('Saving memories to database...')
-    const batchSize = 50
+    // Save new memories in batches to avoid timeout
     const savedMemories: any[] = []
     let hasError = false
     
-    for (let i = 0; i < extractedMemories.length; i += batchSize) {
-      const batch = extractedMemories.slice(i, i + batchSize)
-      console.log(`Saving batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(extractedMemories.length / batchSize)}...`)
+    if (extractionResult.newMemories.length > 0) {
+      console.log('Saving new memories to database...')
+      const batchSize = 50
       
-      const { data, error: insertError } = await supabase
-        .from('memories')
-        .insert(
-          batch.map(m => ({
-            user_id: m.user_id,
-            persona_id: m.persona_id,
-            memory_type: m.memory_type,
-            content: m.content,
-            importance: m.importance,
-            strength: m.strength,
-            context: m.context,
-          }))
-        )
-        .select()
-      
-      if (insertError) {
-        console.error(`Error saving batch ${Math.floor(i / batchSize) + 1}:`, insertError)
-        hasError = true
-        // Continue with other batches even if one fails
-      } else if (data) {
-        savedMemories.push(...data)
+      for (let i = 0; i < extractionResult.newMemories.length; i += batchSize) {
+        const batch = extractionResult.newMemories.slice(i, i + batchSize)
+        console.log(`Saving batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(extractionResult.newMemories.length / batchSize)}...`)
+        
+        const { data, error: insertError } = await supabase
+          .from('memories')
+          .insert(
+            batch.map(m => ({
+              user_id: m.user_id,
+              persona_id: m.persona_id,
+              memory_type: m.memory_type,
+              content: m.content,
+              importance: m.importance,
+              strength: m.strength,
+              context: m.context,
+            }))
+          )
+          .select()
+        
+        if (insertError) {
+          console.error(`Error saving batch ${Math.floor(i / batchSize) + 1}:`, insertError)
+          hasError = true
+        } else if (data) {
+          savedMemories.push(...data)
+        }
       }
     }
     
-    if (hasError && savedMemories.length === 0) {
+    if (hasError && savedMemories.length === 0 && extractionResult.newMemories.length > 0) {
       console.error('Failed to save any memories')
       return new Response(
         JSON.stringify({ error: 'Failed to save memories. Check console for details.' }),
@@ -79,15 +93,16 @@ export async function POST(req: NextRequest) {
       )
     }
     
-    console.log(`Successfully saved ${savedMemories.length} of ${extractedMemories.length} memories`)
+    console.log(`Successfully saved ${savedMemories.length} new memories, updated ${extractionResult.memoryUpdates.length} existing`)
 
     // Analyze patterns
-    const nicknameMemories = extractedMemories.filter(m => 
+    const allMemories = [...extractionResult.newMemories]
+    const nicknameMemories = allMemories.filter(m => 
       m.content.toLowerCase().includes('prefers to be called') ||
       m.content.toLowerCase().includes('responds positively to being called')
     )
     
-    const preferenceMemories = extractedMemories.filter(m => 
+    const preferenceMemories = allMemories.filter(m => 
       m.memory_type === 'preference' && 
       !m.content.toLowerCase().includes('prefers to be called') &&
       !m.content.toLowerCase().includes('responds positively')
@@ -96,12 +111,13 @@ export async function POST(req: NextRequest) {
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Extracted ${extractedMemories.length} memories from conversation`,
+        message: `Extracted ${extractionResult.newMemories.length} new memories and updated ${extractionResult.memoryUpdates.length} existing from conversation`,
         memories: savedMemories,
+        updates: extractionResult.memoryUpdates.length,
         analysis: {
           nicknames: nicknameMemories.length,
           preferences: preferenceMemories.length,
-          other: extractedMemories.length - nicknameMemories.length - preferenceMemories.length,
+          other: allMemories.length - nicknameMemories.length - preferenceMemories.length,
         },
         summary: {
           nicknames: nicknameMemories.map(m => m.content),

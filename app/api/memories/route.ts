@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { retrieveMemories, formatMemoriesForContext } from '@/lib/memory/retriever'
 import { getUserId } from '@/lib/auth/get-user'
+import { Memory } from '@/types/memory'
 
 export async function GET(req: NextRequest) {
   try {
@@ -47,18 +48,40 @@ export async function POST(req: NextRequest) {
       return new Response('Conversation not found', { status: 404 })
     }
 
+    // Get existing memories
+    const { data: existingMemoriesData } = await supabase
+      .from('memories')
+      .select('id, content, memory_type, persona_id, user_id, importance, strength, context, created_at, last_accessed, access_count')
+      .eq('user_id', userId)
+    
+    const existingMemories = (existingMemoriesData || []) as Memory[]
+
     // Extract memories (simple pattern-based for now)
     const { extractMemories } = await import('@/lib/memory/extractor')
-    const extractedMemories = extractMemories(
+    const extractionResult = extractMemories(
       messages,
       userId,
-      personaId || null
+      personaId || null,
+      existingMemories
     )
 
-    // Save memories
-    if (extractedMemories.length > 0) {
+    const { updateMemoryFromConversation } = await import('@/lib/memory/updater')
+
+    // Apply memory updates
+    if (extractionResult.memoryUpdates.length > 0) {
+      for (const update of extractionResult.memoryUpdates) {
+        try {
+          await updateMemoryFromConversation(update.memoryId, update.newContent, userId)
+        } catch (err) {
+          console.error('Error updating memory:', err)
+        }
+      }
+    }
+
+    // Save new memories
+    if (extractionResult.newMemories.length > 0) {
       const { error } = await supabase.from('memories').insert(
-        extractedMemories.map(m => ({
+        extractionResult.newMemories.map(m => ({
           user_id: m.user_id,
           persona_id: m.persona_id,
           memory_type: m.memory_type,
@@ -76,7 +99,8 @@ export async function POST(req: NextRequest) {
 
     return Response.json({ 
       success: true, 
-      memoriesExtracted: extractedMemories.length 
+      memoriesExtracted: extractionResult.newMemories.length,
+      memoriesUpdated: extractionResult.memoryUpdates.length
     })
   } catch (error) {
     console.error('Memories extraction error:', error)

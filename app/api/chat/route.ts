@@ -525,31 +525,70 @@ Be conversational and responsive - match the user's energy and message length.`
             // Extract memories from conversation
             try {
               const { extractMemories } = await import('@/lib/memory/extractor')
+              const { updateMemoryFromConversation } = await import('@/lib/memory/updater')
+              
               const conversationMessages = [
                 ...(processedHistory || []),
                 ...(regenerate ? [] : [{ role: 'user' as const, content: message }]),
                 { role: 'assistant' as const, content: assistantContent },
               ]
-              // Extract memories with the current persona_id
-              // This ensures memories are persona-specific when a persona is selected
-              const extractedMemories = extractMemories(
+              
+              // Get ALL existing memories for this user (across all personas) to check against and update
+              const { data: existingMemoriesData } = await supabase
+                .from('memories')
+                .select('id, content, memory_type, persona_id, user_id, importance, strength, context, created_at, last_accessed, access_count')
+                .eq('user_id', userId)
+              
+              const existingMemories = (existingMemoriesData || []) as Memory[]
+              
+              // Extract memories with existing memories passed in for updates
+              const extractionResult = extractMemories(
                 conversationMessages,
                 userId,
-                activePersonaId || null // Use null for shared memories if no persona
+                activePersonaId || null, // Use null for shared memories if no persona
+                existingMemories
               )
 
-              if (extractedMemories.length > 0) {
-                await supabase.from('memories').insert(
-                  extractedMemories.map(m => ({
-                    user_id: m.user_id,
-                    persona_id: m.persona_id,
-                    memory_type: m.memory_type,
-                    content: m.content,
-                    importance: m.importance,
-                    strength: m.strength,
-                    context: m.context,
-                  }))
+              // Apply memory updates
+              if (extractionResult.memoryUpdates.length > 0) {
+                for (const update of extractionResult.memoryUpdates) {
+                  try {
+                    await updateMemoryFromConversation(
+                      update.memoryId,
+                      update.newContent,
+                      userId
+                    )
+                  } catch (err) {
+                    console.error('Error updating memory:', err)
+                  }
+                }
+              }
+
+              // Insert new memories (already filtered for duplicates by extractor)
+              if (extractionResult.newMemories.length > 0) {
+                // Double-check for exact duplicates before inserting
+                const existingContentSet = new Set(
+                  existingMemories.map(m => m.content.toLowerCase().trim())
                 )
+                
+                const finalNewMemories = extractionResult.newMemories.filter(m => {
+                  const normalizedContent = m.content.toLowerCase().trim()
+                  return !existingContentSet.has(normalizedContent)
+                })
+                
+                if (finalNewMemories.length > 0) {
+                  await supabase.from('memories').insert(
+                    finalNewMemories.map(m => ({
+                      user_id: m.user_id,
+                      persona_id: m.persona_id,
+                      memory_type: m.memory_type,
+                      content: m.content,
+                      importance: m.importance,
+                      strength: m.strength,
+                      context: m.context,
+                    }))
+                  )
+                }
               }
               
               // Check for memory updates/contradictions
