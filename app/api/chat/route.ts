@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { chatWithOpenRouter } from '@/lib/openrouter/client'
 import { getUserId } from '@/lib/auth/get-user'
 import { summarizeConversation } from '@/lib/chat/summarizer'
+import { Memory } from '@/types/memory'
 
 export async function POST(req: NextRequest) {
   try {
