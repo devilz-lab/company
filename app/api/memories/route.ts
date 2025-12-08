@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { retrieveMemories, formatMemoriesForContext } from '@/lib/memory/retriever'
+import { getUserId } from '@/lib/auth/get-user'
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,7 +10,7 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10')
 
     const supabase = await createClient()
-    const userId = '00000000-0000-0000-0000-000000000001' // TODO: Get from auth
+    const userId = await getUserId()
 
     const memories = await retrieveMemories(userId, personaId || null, undefined, limit)
 
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = await createClient()
-    const userId = '00000000-0000-0000-0000-000000000001' // TODO: Get from auth
+    const userId = await getUserId()
 
     // Get conversation messages
     const { data: messages } = await supabase

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getUserId } from '@/lib/auth/get-user'
 
 // This endpoint should be called by Vercel Cron or external cron service
 // To set up: Add to vercel.json or use external service like cron-job.org
@@ -12,7 +13,7 @@ export async function GET(req: NextRequest) {
     }
 
     const supabase = await createClient()
-    const userId = '00000000-0000-0000-0000-000000000001'
+    const userId = await getUserId()
 
     // Get active schedules that are due
     const now = new Date().toISOString()

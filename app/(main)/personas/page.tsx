@@ -11,6 +11,7 @@ export default function PersonasPage() {
   const [personas, setPersonas] = useState<Persona[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showCreator, setShowCreator] = useState(false)
+  const [editingPersona, setEditingPersona] = useState<Persona | null>(null)
 
   useEffect(() => {
     loadPersonas()
@@ -46,34 +47,63 @@ export default function PersonasPage() {
 
   const handleCreate = async (personaData: PersonaCreate) => {
     try {
-      console.log('Creating persona with data:', personaData)
-      const response = await fetch('/api/personas', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(personaData),
-      })
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('API Error Response:', response.status, errorText)
-        let errorMessage = 'Failed to create persona'
-        try {
-          const errorJson = JSON.parse(errorText)
-          errorMessage = errorJson.error || errorMessage
-        } catch {
-          errorMessage = errorText || errorMessage
+      if (editingPersona) {
+        // Update existing persona
+        const response = await fetch(`/api/personas/${editingPersona.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(personaData),
+        })
+        
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error('API Error Response:', response.status, errorText)
+          let errorMessage = 'Failed to update persona'
+          try {
+            const errorJson = JSON.parse(errorText)
+            errorMessage = errorJson.error || errorMessage
+          } catch {
+            errorMessage = errorText || errorMessage
+          }
+          alert(`Error: ${errorMessage}\n\nCheck browser console for details.`)
+          throw new Error(errorMessage)
         }
-        alert(`Error: ${errorMessage}\n\nCheck browser console for details.`)
-        throw new Error(errorMessage)
+        
+        const data = await response.json()
+        console.log('Persona updated successfully:', data)
+        await loadPersonas()
+        setEditingPersona(null)
+      } else {
+        // Create new persona
+        console.log('Creating persona with data:', personaData)
+        const response = await fetch('/api/personas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(personaData),
+        })
+        
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error('API Error Response:', response.status, errorText)
+          let errorMessage = 'Failed to create persona'
+          try {
+            const errorJson = JSON.parse(errorText)
+            errorMessage = errorJson.error || errorMessage
+          } catch {
+            errorMessage = errorText || errorMessage
+          }
+          alert(`Error: ${errorMessage}\n\nCheck browser console for details.`)
+          throw new Error(errorMessage)
+        }
+        
+        const data = await response.json()
+        console.log('Persona created successfully:', data)
+        await loadPersonas()
       }
-      
-      const data = await response.json()
-      console.log('Persona created successfully:', data)
-      await loadPersonas()
     } catch (error) {
-      console.error('Error creating persona:', error)
+      console.error('Error saving persona:', error)
       if (!(error instanceof Error && error.message.includes('Error:'))) {
-        alert(`Error creating persona: ${error instanceof Error ? error.message : 'Unknown error'}\n\nCheck browser console for details.`)
+        alert(`Error saving persona: ${error instanceof Error ? error.message : 'Unknown error'}\n\nCheck browser console for details.`)
       }
       throw error
     }
@@ -95,8 +125,8 @@ export default function PersonasPage() {
   }
 
   const handleEdit = (persona: Persona) => {
-    // TODO: Implement edit functionality
-    alert('Edit functionality coming soon!')
+    setEditingPersona(persona)
+    setShowCreator(true)
   }
 
   if (isLoading) {
@@ -161,8 +191,12 @@ export default function PersonasPage() {
 
       {showCreator && (
         <PersonaCreator
-          onClose={() => setShowCreator(false)}
+          onClose={() => {
+            setShowCreator(false)
+            setEditingPersona(null)
+          }}
           onSave={handleCreate}
+          editingPersona={editingPersona}
         />
       )}
     </div>

@@ -1,11 +1,12 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { calculateRelationshipLevel } from '@/lib/relationship/levels'
+import { getUserId } from '@/lib/auth/get-user'
 
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient()
-    const userId = '00000000-0000-0000-0000-000000000001'
+    const userId = await getUserId()
 
     const levelData = await calculateRelationshipLevel(userId)
 

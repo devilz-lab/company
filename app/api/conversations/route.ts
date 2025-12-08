@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getUserId } from '@/lib/auth/get-user'
 
 export async function GET(req: NextRequest) {
   try {
@@ -8,7 +9,7 @@ export async function GET(req: NextRequest) {
     const personaId = searchParams.get('personaId')
 
     const supabase = await createClient()
-    const userId = '00000000-0000-0000-0000-000000000001'
+    const userId = await getUserId()
 
     let query = supabase
       .from('conversations')
@@ -30,9 +31,14 @@ export async function GET(req: NextRequest) {
       .eq('is_archived', archived)
       .order('updated_at', { ascending: false })
 
+    // Handle persona_id filter - can be null for shared conversations
     if (personaId) {
       query = query.eq('persona_id', personaId)
+    } else if (personaId === null) {
+      // Explicitly filter for null persona_id (shared conversations)
+      query = query.is('persona_id', null)
     }
+    // If personaId is undefined, show all conversations
 
     const { data: conversations, error } = await query
 

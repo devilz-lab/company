@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getUserId } from '@/lib/auth/get-user'
 
 export async function GET(req: NextRequest) {
   try {
@@ -7,7 +8,7 @@ export async function GET(req: NextRequest) {
     const personaId = searchParams.get('personaId')
 
     const supabase = await createClient()
-    const userId = '00000000-0000-0000-0000-000000000001'
+    const userId = await getUserId()
 
     let query = supabase
       .from('scenarios')
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = await createClient()
-    const userId = '00000000-0000-0000-0000-000000000001'
+    const userId = await getUserId()
 
     const { data: scenario, error } = await supabase
       .from('scenarios')

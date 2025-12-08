@@ -8,6 +8,7 @@ import { Avatar } from './Avatar'
 interface PersonaCreatorProps {
   onClose: () => void
   onSave: (persona: PersonaCreate) => Promise<void>
+  editingPersona?: Persona | null
 }
 
 const communicationStyles = ['casual', 'formal', 'intimate', 'playful', 'dominant', 'submissive'] as const
@@ -24,11 +25,17 @@ const personalityTraits = [
   'kinky',
 ] as const
 
-export function PersonaCreator({ onClose, onSave }: PersonaCreatorProps) {
-  const [name, setName] = useState('')
-  const [communicationStyle, setCommunicationStyle] = useState<PersonaCreate['communication_style']>('casual')
-  const [selectedTraits, setSelectedTraits] = useState<string[]>([])
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+export function PersonaCreator({ onClose, onSave, editingPersona }: PersonaCreatorProps) {
+  const [name, setName] = useState(editingPersona?.name || '')
+  const [communicationStyle, setCommunicationStyle] = useState<PersonaCreate['communication_style']>(
+    editingPersona?.communication_style || 'casual'
+  )
+  const [selectedTraits, setSelectedTraits] = useState<string[]>(
+    editingPersona?.personality_traits ? Object.keys(editingPersona.personality_traits).filter(
+      key => editingPersona.personality_traits[key] === true
+    ) : []
+  )
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(editingPersona?.avatar_url || null)
   const [isSaving, setIsSaving] = useState(false)
 
   const toggleTrait = (trait: string) => {
@@ -66,7 +73,9 @@ export function PersonaCreator({ onClose, onSave }: PersonaCreatorProps) {
     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
       <div className="bg-[#1a1a1a] rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-[#ededed]">Create Persona</h2>
+          <h2 className="text-xl font-bold text-[#ededed]">
+            {editingPersona ? 'Edit Persona' : 'Create Persona'}
+          </h2>
           <button
             onClick={onClose}
             className="p-2 rounded-lg hover:bg-[#2a2a2a] transition-colors"
@@ -159,7 +168,7 @@ export function PersonaCreator({ onClose, onSave }: PersonaCreatorProps) {
               disabled={!name.trim() || isSaving}
               className="flex-1 py-3 rounded-lg bg-[#2a2a2a] text-[#ededed] hover:bg-[#3a3a3a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSaving ? 'Creating...' : 'Create'}
+              {isSaving ? (editingPersona ? 'Saving...' : 'Creating...') : (editingPersona ? 'Save Changes' : 'Create')}
             </button>
           </div>
         </form>

@@ -1,11 +1,12 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { chatWithOpenRouter } from '@/lib/openrouter/client'
+import { getUserId } from '@/lib/auth/get-user'
 
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient()
-    const userId = '00000000-0000-0000-0000-000000000001'
+    const userId = await getUserId()
 
     const { data: messages, error } = await supabase
       .from('proactive_messages')
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
   try {
     const { scheduleId } = await req.json()
     const supabase = await createClient()
-    const userId = '00000000-0000-0000-0000-000000000001'
+    const userId = await getUserId()
 
     // Get active schedule
     const { data: schedule } = await supabase

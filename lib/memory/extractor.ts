@@ -174,6 +174,51 @@ export function extractMemories(
     })
   }
 
+  // Extract positive emotions and happy moments
+  userMessages.forEach((msg, idx) => {
+    const content = msg.content.toLowerCase()
+    
+    // Happy/positive emotion patterns
+    const happyPatterns = [
+      /\b(i'm happy|i'm glad|i'm excited|i'm thrilled|i'm delighted|i'm pleased|i'm grateful|i'm thankful|i feel good|i feel great|i feel amazing|i feel wonderful|i feel happy|that made me happy|that makes me happy|i love it|i love that|i enjoyed|i enjoyed that|that was great|that was amazing|that was wonderful|that felt good|that felt great)\b/i,
+      /\b(happy|glad|excited|thrilled|delighted|pleased|grateful|thankful|joy|joyful|bliss|blissful|content|contented|satisfied|fulfilled)\b/i,
+    ]
+    
+    happyPatterns.forEach(pattern => {
+      if (msg.content.match(pattern)) {
+        // Extract what made them happy
+        const happyMatch = msg.content.match(/(?:that|it|this|which|what)(?:\s+(?:made|makes|made me|makes me))?\s+(?:me\s+)?(?:feel\s+)?(?:happy|good|great|amazing|wonderful|excited|thrilled|glad|delighted|pleased|grateful|thankful)/i)
+        const contextMatch = msg.content.match(/(?:when|after|because|since|from)\s+(.+?)(?:\s+(?:made|makes|i|that|it))?/i)
+        
+        let happyContext = msg.content
+        if (contextMatch) {
+          happyContext = contextMatch[1]
+        } else if (happyMatch) {
+          // Try to get the sentence before the happy expression
+          const sentences = msg.content.split(/[.!?]/)
+          const happySentence = sentences.find(s => s.match(pattern))
+          if (happySentence) {
+            happyContext = happySentence.trim()
+          }
+        }
+        
+        memories.push({
+          id: `happy-${Date.now()}-${idx}`,
+          user_id: userId,
+          persona_id: personaId,
+          memory_type: 'preference',
+          content: `User felt happy/positive about: ${happyContext.substring(0, 200)}. Reference this to bring them joy.`,
+          importance: 7,
+          strength: 1.0,
+          context: { conversation_index: idx, emotion: 'happy', original_message: msg.content },
+          created_at: new Date().toISOString(),
+          last_accessed: null,
+          access_count: 0,
+        })
+      }
+    })
+  })
+
   return memories
 }
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Send, Loader2, Palette, MessageCircle } from 'lucide-react'
+import { Send, Loader2, Palette, MessageCircle, Plus } from 'lucide-react'
 import { formatRelativeTime } from '@/lib/utils'
 import { ConversationModeSelector } from '@/components/chat/ConversationModeSelector'
 import { MessageReactions } from '@/components/chat/MessageReactions'
@@ -25,9 +25,33 @@ export default function ChatPage() {
   const [conversationMode, setConversationMode] = useState<ConversationMode>('quick')
   const [conversationTheme, setConversationTheme] = useState<Theme>('default')
   const [conversationId, setConversationId] = useState<string | null>(null)
+  const [selectedPersonaId, setSelectedPersonaId] = useState<string | null>(null)
+  const [personas, setPersonas] = useState<any[]>([])
+  const [showPersonaSelector, setShowPersonaSelector] = useState(false)
   const [showThemeSelector, setShowThemeSelector] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  // Load personas
+  useEffect(() => {
+    const loadPersonas = async () => {
+      try {
+        const response = await fetch('/api/personas')
+        if (response.ok) {
+          const data = await response.json()
+          setPersonas(data.personas || [])
+          // Set active persona as default
+          const activePersona = data.personas?.find((p: any) => p.is_active)
+          if (activePersona) {
+            setSelectedPersonaId(activePersona.id)
+          }
+        }
+      } catch (error) {
+        console.error('Error loading personas:', error)
+      }
+    }
+    loadPersonas()
+  }, [])
 
   // Load conversation from URL or continue last conversation
   useEffect(() => {
@@ -120,6 +144,7 @@ export default function ChatPage() {
         body: JSON.stringify({
           message: userMessage.content,
           conversationId: conversationId,
+          personaId: selectedPersonaId,
           mode: conversationMode,
         }),
       })
@@ -230,10 +255,79 @@ export default function ChatPage() {
     }
   }
 
+  const startNewChat = () => {
+    setShowPersonaSelector(true)
+  }
+
+  const confirmNewChat = (personaId: string | null) => {
+    setMessages([])
+    setConversationId(null)
+    setSelectedPersonaId(personaId)
+    setInput('')
+    setShowPersonaSelector(false)
+    // Clear URL parameter
+    window.history.replaceState({}, '', '/chat')
+  }
+
   return (
     <div className="flex flex-col h-full max-h-[calc(100vh-4rem)]">
-      {/* Mode Selector */}
-      <div className="px-4 pt-4 pb-2 border-b border-[#2a2a2a] space-y-3">
+      {/* Header with New Chat button */}
+      <div className="px-4 pt-4 pb-2 border-b border-[#2a2a2a]">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-semibold text-[#ededed]">Chat</h1>
+            {selectedPersonaId && (
+              <span className="text-xs text-[#888]">
+                with {personas.find(p => p.id === selectedPersonaId)?.name || 'Companion'}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={startNewChat}
+            className="flex items-center gap-2 px-3 py-1.5 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#ededed] rounded-lg text-sm font-medium transition-colors"
+            title="Start a new conversation"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Chat</span>
+          </button>
+        </div>
+        
+        {/* Persona Selector Modal */}
+        {showPersonaSelector && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowPersonaSelector(false)}>
+            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-xl font-semibold text-[#ededed] mb-4">Start New Chat</h2>
+              <p className="text-sm text-[#888] mb-4">
+                Select a persona for this conversation. Each persona will have separate memories and conversation history.
+              </p>
+              <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
+                <button
+                  onClick={() => confirmNewChat(null)}
+                  className="w-full text-left px-4 py-3 bg-[#2a2a2a] hover:bg-[#3a3a3a] rounded-lg transition-colors"
+                >
+                  <div className="font-medium text-[#ededed]">Default (No Persona)</div>
+                  <div className="text-xs text-[#888] mt-1">Uses shared memories</div>
+                </button>
+                {personas.map((persona) => (
+                  <button
+                    key={persona.id}
+                    onClick={() => confirmNewChat(persona.id)}
+                    className="w-full text-left px-4 py-3 bg-[#2a2a2a] hover:bg-[#3a3a3a] rounded-lg transition-colors"
+                  >
+                    <div className="font-medium text-[#ededed]">{persona.name}</div>
+                    <div className="text-xs text-[#888] mt-1">{persona.communication_style}</div>
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setShowPersonaSelector(false)}
+                className="w-full px-4 py-2 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-[#ededed] rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
         <ConversationModeSelector
           mode={conversationMode}
           onModeChange={setConversationMode}

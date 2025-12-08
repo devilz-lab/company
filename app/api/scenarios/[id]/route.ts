@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getUserId } from '@/lib/auth/get-user'
 
 export async function PATCH(
   req: NextRequest,
@@ -8,7 +9,7 @@ export async function PATCH(
   try {
     const { title, description, template_data, is_favorite, usage_count } = await req.json()
     const supabase = await createClient()
-    const userId = '00000000-0000-0000-0000-000000000001'
+    const userId = await getUserId()
 
     const updates: any = {}
     if (title !== undefined) updates.title = title
@@ -43,7 +44,7 @@ export async function DELETE(
 ) {
   try {
     const supabase = await createClient()
-    const userId = '00000000-0000-0000-0000-000000000001'
+    const userId = await getUserId()
 
     const { error } = await supabase
       .from('scenarios')

@@ -1,11 +1,12 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { chatWithOpenRouter } from '@/lib/openrouter/client'
+import { getUserId } from '@/lib/auth/get-user'
 
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient()
-    const userId = '00000000-0000-0000-0000-000000000001'
+    const userId = await getUserId()
 
     const { data: entries, error } = await supabase
       .from('journal_entries')
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = await createClient()
-    const userId = '00000000-0000-0000-0000-000000000001'
+    const userId = await getUserId()
 
     // Create journal entry
     const { data: entry, error } = await supabase

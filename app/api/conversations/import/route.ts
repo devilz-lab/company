@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { extractMemories } from '@/lib/memory/extractor'
+import { getUserId } from '@/lib/auth/get-user'
 
 /**
  * Import and analyze example conversations to extract patterns
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
     console.log(`Importing conversation with ${messages.length} messages`)
 
     const supabase = await createClient()
-    const userId = '00000000-0000-0000-0000-000000000001' // TODO: Get from auth
+    const userId = await getUserId()
 
     // Extract memories from the imported conversation
     console.log('Extracting memories...')

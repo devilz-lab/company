@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getUserId } from '@/lib/auth/get-user'
 
 export async function GET(
   req: NextRequest,
@@ -7,8 +8,9 @@ export async function GET(
 ) {
   try {
     const supabase = await createClient()
-    const userId = '00000000-0000-0000-0000-000000000001'
+    const userId = await getUserId()
 
+    // Use left join to handle null persona_id gracefully
     const { data: conversation, error } = await supabase
       .from('conversations')
       .select(`
@@ -23,6 +25,8 @@ export async function GET(
       .eq('id', params.id)
       .eq('user_id', userId)
       .single()
+    
+    // Handle null persona_id - Supabase will return null for the join, which is fine
 
     if (error) throw error
 
@@ -53,7 +57,7 @@ export async function PATCH(
   try {
     const { is_archived, tags } = await req.json()
     const supabase = await createClient()
-    const userId = '00000000-0000-0000-0000-000000000001'
+    const userId = await getUserId()
 
     const updates: any = {}
     if (is_archived !== undefined) updates.is_archived = is_archived
@@ -85,7 +89,7 @@ export async function DELETE(
 ) {
   try {
     const supabase = await createClient()
-    const userId = '00000000-0000-0000-0000-000000000001'
+    const userId = await getUserId()
 
     const { error } = await supabase
       .from('conversations')
