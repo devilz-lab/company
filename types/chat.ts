@@ -5,7 +5,7 @@ export interface Message {
   conversation_id: string
   role: 'user' | 'assistant'
   content: string
-  reactions: Record<string, boolean> | null
+  reactions: Record<string, number | boolean> | null
   created_at: string
   metadata: {
     typing_speed?: number

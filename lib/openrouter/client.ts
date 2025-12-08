@@ -21,9 +21,13 @@ export interface OpenRouterResponse {
 
 export async function chatWithOpenRouter(
   messages: OpenRouterMessage[],
-  model: string = 'meta-llama/llama-3-70b-instruct',
+  model: string = 'mistralai/mistral-large',
   stream: boolean = true
 ): Promise<ReadableStream<Uint8Array> | OpenRouterResponse> {
+  // Use a model that allows NSFW content
+  // Recommended models for NSFW: mistralai/mistral-large, mistralai/mixtral-8x7b-instruct
+  // Avoid: meta-llama models (they have strict content filters)
+  
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -39,6 +43,8 @@ export async function chatWithOpenRouter(
       temperature: 0.85, // Slightly higher for more creative, varied responses
       max_tokens: 4000, // Increased for longer, more detailed responses
       top_p: 0.9, // Nucleus sampling for better quality
+      frequency_penalty: 0.3, // Reduce repetition of words/phrases
+      presence_penalty: 0.2, // Encourage exploring new topics
     }),
   })
 

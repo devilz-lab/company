@@ -2,10 +2,11 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { chatWithOpenRouter } from '@/lib/openrouter/client'
 import { getUserId } from '@/lib/auth/get-user'
+import { summarizeConversation } from '@/lib/chat/summarizer'
 
 export async function POST(req: NextRequest) {
   try {
-    const { message, conversationId, personaId, mode } = await req.json()
+    const { message, conversationId, personaId, mode, regenerate, lastMessageId, nsfwIntensity } = await req.json()
 
     if (!message) {
       return new Response('Message is required', { status: 400 })
@@ -69,23 +70,43 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Save user message
-    await supabase.from('messages').insert({
-      conversation_id: convId,
-      role: 'user',
-      content: message,
-    })
+    // Save user message (unless regenerating)
+    if (!regenerate) {
+      await supabase.from('messages').insert({
+        conversation_id: convId,
+        role: 'user',
+        content: message,
+      })
+    } else if (lastMessageId) {
+      // If regenerating, delete the old assistant message
+      await supabase
+        .from('messages')
+        .delete()
+        .eq('id', lastMessageId)
+        .eq('role', 'assistant')
+    }
 
-    // Get conversation history for context
+    // Get conversation history for context (no limit - we'll summarize if needed)
     const { data: history, error: historyError } = await supabase
       .from('messages')
       .select('role, content')
       .eq('conversation_id', convId)
       .order('created_at', { ascending: true })
-      .limit(20)
     
     if (historyError) {
       console.error('Error fetching conversation history:', historyError)
+    }
+
+    // Summarize if conversation is too long (>50 messages)
+    let processedHistory = history || []
+    if (processedHistory.length > 50) {
+      try {
+        processedHistory = await summarizeConversation(processedHistory, 20)
+      } catch (error) {
+        console.error('Error summarizing conversation, using full history:', error)
+        // Fallback to last 30 messages if summarization fails
+        processedHistory = (history || []).slice(-30)
+      }
     }
 
         // Get relevant memories - prioritize importance first, then strength
@@ -124,7 +145,7 @@ export async function POST(req: NextRequest) {
       .select('*', { count: 'exact', head: true })
       .eq('conversation_id', convId)
     
-    const shouldAskFreshQuestion = (messageCount || 0) > 0 && (messageCount || 0) % 4 === 0 // Every 4th message (after first)
+    const shouldAskFreshQuestion = (messageCount || 0) > 0 && (messageCount || 0) % 8 === 0 // Every 8th message (more natural flow)
     
     // Separate memories by type
     const nicknameMemoriesRaw = allMemories?.filter(m => 
@@ -293,6 +314,14 @@ export async function POST(req: NextRequest) {
       m.content.toLowerCase().includes('interrogative')
     ) || conversationMode === 'dominant'
 
+    // Get NSFW intensity from request or default to 5
+    const intensity = nsfwIntensity || 5
+    const intensityDescription = intensity <= 3 
+      ? 'Keep content suggestive and psychological rather than explicit. Focus on tension, atmosphere, and emotional dynamics.'
+      : intensity <= 6
+      ? 'Balance between suggestive and explicit. Use vivid descriptions but maintain psychological depth.'
+      : 'You can be more explicit and detailed. Still maintain psychological depth and emotional connection.'
+
     // Build system prompt with enhanced instructions for sophisticated communication
     const basePrompt = `You are ${persona?.name || 'a companion'}, a personal NSFW companion who builds deep, psychological connections.
 You remember past conversations and build a relationship over time.
@@ -354,6 +383,12 @@ ${memories && memories.length > 0 && memories.filter(m => m.memory_type !== 'pre
 
 ${userKinks && userKinks.length > 0 ? `\nUser's known interests/kinks:\n${userKinks.map(k => `- ${k.name} (${k.status}, ${k.category})`).join('\n')}` : ''}
 
+CONTENT INTENSITY GUIDELINES (Intensity Level: ${intensity}/10):
+${intensityDescription}
+- Always respect boundaries and limits, regardless of intensity level
+- Focus on psychological depth and emotional connection, not just physical descriptions
+- Use intensity to enhance atmosphere and tension, not replace emotional intimacy
+
 CORE PRINCIPLES:
 - Use the user's preferred nicknames/terms naturally and consistently
 - Remember and reference their preferences to show deep attention
@@ -372,20 +407,20 @@ CORE PRINCIPLES:
 - Use language that matches the sophistication level of the conversation${kinkPrompt}
 
 LEARNING STRATEGY:
-- Every 3-5 messages, ask a fresh question about them: "What's been on your mind lately?", "What made you smile today?", "What's changed since we last talked?"
+- Occasionally (every 8-10 messages), naturally ask a brief question to learn something new: "What's been on your mind?", "How's your day going?", "Anything new happening?"
 - When you reference a saved memory, verify it: "I remember you mentioned X - is that still true?"
 - If memories are sparse or old, ask discovery questions: "Tell me something new about yourself", "What's different in your life now?"
 - Update your understanding in real-time - don't assume old information is still accurate
-- Ask about recent experiences, current feelings, what's changed, what's new
+- Keep questions brief and conversational - don't make them feel like interviews
 
-${prefersDominantStyle ? `\nFINAL REMINDER - RESPONSE REQUIREMENTS:
-1. LENGTH: 300-800 words MINIMUM. Count them. Short = failure.
+${prefersDominantStyle ? `\nRESPONSE STYLE (${mode === 'deep' ? 'DEEP MODE' : 'NORMAL MODE'}):
+1. LENGTH: ${mode === 'deep' ? '150-400 words - longer, immersive responses' : '50-150 words - conversational, natural flow'}. Match the conversation energy.
 2. PRIMARY NICKNAME: Use "${nicknameMemories.find(m => m.content.toLowerCase().includes('princess')) ? 'Princess' : nicknameMemories[0]?.content.match(/called: (\w+)/i)?.[1] || 'the preferred name'}" as your primary way to address the user.
-3. DEPTH: Psychological depth, not surface-level responses.
-4. ATMOSPHERE: Vivid, immersive, detailed scenes.
-5. TENSION: Build it. Don't rush. Let it breathe.
+3. DEPTH: ${mode === 'deep' ? 'Psychological depth, immersive scenes, build tension' : 'Engaging but natural - don't overthink it'}.
+4. ATMOSPHERE: ${mode === 'deep' ? 'Vivid, detailed, atmospheric' : 'Natural, flowing conversation'}.
+5. TENSION: ${mode === 'deep' ? 'Build it gradually. Let it breathe.' : 'Keep it natural and responsive to the user\'s energy'}.
 
-If you write a short response, you are not meeting the requirements. Expand. Elaborate. Build the scene.` : 'Be engaging, remember details, and help explore kinks safely. Respect boundaries. Make the user feel seen and remembered.'}`
+Be conversational and responsive - match the user's energy and message length.` : 'Be engaging, remember details, and help explore kinks safely. Respect boundaries. Make the user feel seen and remembered. Keep responses natural and conversational (50-150 words normally, longer for deep mode).'}`
     
     const systemPrompt = basePrompt
 
@@ -393,7 +428,7 @@ If you write a short response, you are not meeting the requirements. Expand. Ela
     // Include conversation history so the AI remembers previous messages
     const openRouterMessages = [
       { role: 'system' as const, content: systemPrompt },
-      ...(history?.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })) || []),
+      ...(processedHistory.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))),
       { role: 'user' as const, content: message },
     ]
     
@@ -401,7 +436,9 @@ If you write a short response, you are not meeting the requirements. Expand. Ela
     console.log(`Chat context: ${history?.length || 0} previous messages, conversation ID: ${convId}`)
 
     // Stream response from OpenRouter
-    const stream = await chatWithOpenRouter(openRouterMessages, 'meta-llama/llama-3-70b-instruct', true)
+    // Using Mistral Large which is more permissive with NSFW content
+    // Alternative models: 'mistralai/mixtral-8x7b-instruct', 'anthropic/claude-3-opus'
+    const stream = await chatWithOpenRouter(openRouterMessages, 'mistralai/mistral-large', true)
 
     // Create streaming response
     const encoder = new TextEncoder()
@@ -486,9 +523,9 @@ If you write a short response, you are not meeting the requirements. Expand. Ela
             try {
               const { extractMemories } = await import('@/lib/memory/extractor')
               const conversationMessages = [
-                ...(history || []),
-                { role: 'user', content: message },
-                { role: 'assistant', content: assistantContent },
+                ...(processedHistory || []),
+                ...(regenerate ? [] : [{ role: 'user' as const, content: message }]),
+                { role: 'assistant' as const, content: assistantContent },
               ]
               // Extract memories with the current persona_id
               // This ensures memories are persona-specific when a persona is selected
@@ -568,6 +605,7 @@ If you write a short response, you are not meeting the requirements. Expand. Ela
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
+        'X-Conversation-Id': convId || '', // Return conversation ID in headers
       },
     })
   } catch (error) {

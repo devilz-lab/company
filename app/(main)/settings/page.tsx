@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { LanguageSelector } from '@/components/i18n/LanguageSelector'
 import { Language } from '@/lib/i18n/translator'
-import { Upload } from 'lucide-react'
+import { Upload, Download, FileJson, FileSpreadsheet } from 'lucide-react'
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -32,6 +32,14 @@ export default function SettingsPage() {
   const [dataSharing, setDataSharing] = useState(false)
   const [analyticsEnabled, setAnalyticsEnabled] = useState(true)
   const [deleteAfterDays, setDeleteAfterDays] = useState<number | null>(null)
+  
+  // NSFW controls
+  const [nsfwIntensity, setNsfwIntensity] = useState<number>(5) // 1-10 scale
+  
+  // Export state
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportType, setExportType] = useState<'all' | 'conversations' | 'memories' | 'kinks' | 'journal' | 'personas'>('all')
+  const [exportFormat, setExportFormat] = useState<'json' | 'csv'>('json')
 
   useEffect(() => {
     // Load saved preferences
@@ -112,6 +120,12 @@ export default function SettingsPage() {
       const days = parseInt(savedDeleteAfterDays)
       setDeleteAfterDays(isNaN(days) ? null : days)
     }
+    
+    const savedNsfwIntensity = localStorage.getItem('nsfwIntensity')
+    if (savedNsfwIntensity !== null) {
+      const intensity = parseInt(savedNsfwIntensity)
+      setNsfwIntensity(isNaN(intensity) ? 5 : Math.max(1, Math.min(10, intensity)))
+    }
   }, [])
 
   const handleLanguageChange = (newLanguage: Language) => {
@@ -127,6 +141,35 @@ export default function SettingsPage() {
   const handleProactiveChange = (enabled: boolean) => {
     setProactiveMessagesEnabled(enabled)
     localStorage.setItem('proactiveMessagesEnabled', String(enabled))
+  }
+
+  const handleExport = async () => {
+    setIsExporting(true)
+    try {
+      const url = `/api/export?format=${exportFormat}&type=${exportType}`
+      const response = await fetch(url)
+      
+      if (!response.ok) {
+        throw new Error('Export failed')
+      }
+
+      const blob = await response.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = downloadUrl
+      a.download = `companion-export-${exportType}-${new Date().toISOString().split('T')[0]}.${exportFormat}`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(downloadUrl)
+      
+      alert('Export completed successfully!')
+    } catch (error) {
+      console.error('Export error:', error)
+      alert('Failed to export data. Please try again.')
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   return (
@@ -174,19 +217,134 @@ export default function SettingsPage() {
           </label>
         </div>
 
-        {/* Import Conversation */}
+        {/* Data Export/Import */}
         <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
-          <h3 className="text-lg font-semibold text-[#ededed] mb-3">Import Conversation</h3>
-          <p className="text-sm text-[#888] mb-3">
-            Import a conversation from Grok or another chat to extract nicknames, preferences, and relationship patterns.
-          </p>
-          <button
-            onClick={() => router.push('/settings/import')}
-            className="w-full bg-[#3a3a3a] hover:bg-[#4a4a4a] text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
-          >
-            <Upload className="w-4 h-4" />
-            Import Conversation
-          </button>
+          <h3 className="text-lg font-semibold text-[#ededed] mb-3">Data Management</h3>
+          
+          {/* Export Section */}
+          <div className="mb-4">
+            <h4 className="text-sm font-medium text-[#ededed] mb-2">Export Data</h4>
+            <p className="text-xs text-[#888] mb-3">
+              Download your data as JSON or CSV for backup or analysis.
+            </p>
+            
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-[#888] mb-1">
+                  Export Type
+                </label>
+                <select
+                  value={exportType}
+                  onChange={(e) => setExportType(e.target.value as any)}
+                  className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-[#ededed] focus:outline-none focus:border-[#3a3a3a]"
+                >
+                  <option value="all">All Data</option>
+                  <option value="conversations">Conversations</option>
+                  <option value="memories">Memories</option>
+                  <option value="kinks">Kinks</option>
+                  <option value="journal">Journal</option>
+                  <option value="personas">Personas</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-xs font-medium text-[#888] mb-1">
+                  Format
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setExportFormat('json')}
+                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      exportFormat === 'json'
+                        ? 'bg-[#3a3a3a] text-[#ededed]'
+                        : 'bg-[#0f0f0f] border border-[#2a2a2a] text-[#888]'
+                    }`}
+                  >
+                    <FileJson className="w-4 h-4" />
+                    JSON
+                  </button>
+                  <button
+                    onClick={() => setExportFormat('csv')}
+                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      exportFormat === 'csv'
+                        ? 'bg-[#3a3a3a] text-[#ededed]'
+                        : 'bg-[#0f0f0f] border border-[#2a2a2a] text-[#888]'
+                    }`}
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    CSV
+                  </button>
+                </div>
+              </div>
+              
+              <button
+                onClick={handleExport}
+                disabled={isExporting}
+                className="w-full bg-[#3a3a3a] hover:bg-[#4a4a4a] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                {isExporting ? 'Exporting...' : 'Export Data'}
+              </button>
+            </div>
+          </div>
+          
+          {/* Import Section */}
+          <div className="border-t border-[#2a2a2a] pt-4">
+            <h4 className="text-sm font-medium text-[#ededed] mb-2">Import Conversation</h4>
+            <p className="text-xs text-[#888] mb-3">
+              Import a conversation from Grok or another chat to extract nicknames, preferences, and relationship patterns.
+            </p>
+            <div className="space-y-2">
+              <button
+                onClick={() => router.push('/settings/import')}
+                className="w-full bg-[#3a3a3a] hover:bg-[#4a4a4a] text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                Import Conversation
+              </button>
+              <button
+                onClick={() => {
+                  const input = document.createElement('input')
+                  input.type = 'file'
+                  input.accept = '.json'
+                  input.onchange = async (e) => {
+                    const file = (e.target as HTMLInputElement).files?.[0]
+                    if (!file) return
+                    
+                    try {
+                      const text = await file.text()
+                      const data = JSON.parse(text)
+                      
+                      if (!confirm(`This will restore ${data.conversations?.length || 0} conversations, ${data.memories?.length || 0} memories, and other data. Continue?`)) {
+                        return
+                      }
+                      
+                      // Import data via API
+                      const response = await fetch('/api/import', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data),
+                      })
+                      
+                      if (response.ok) {
+                        alert('Data restored successfully! Please refresh the page.')
+                      } else {
+                        throw new Error('Import failed')
+                      }
+                    } catch (error) {
+                      console.error('Import error:', error)
+                      alert('Failed to import data. Please check the file format.')
+                    }
+                  }
+                  input.click()
+                }}
+                className="w-full bg-[#2a2a2a] hover:bg-[#3a3a3a] text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                Restore from Backup
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Memory Extraction Settings */}
@@ -334,6 +492,38 @@ export default function SettingsPage() {
                   className="w-4 h-4 rounded bg-[#2a2a2a] border-[#3a3a3a] text-[#3a3a3a]"
                 />
               </label>
+            </div>
+          </div>
+        </div>
+
+        {/* NSFW Controls */}
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
+          <h3 className="text-lg font-semibold text-[#ededed] mb-3">Content Intensity</h3>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-[#ededed] mb-2">
+                NSFW Intensity: {nsfwIntensity}/10
+              </label>
+              <input
+                type="range"
+                min="1"
+                max="10"
+                value={nsfwIntensity}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value)
+                  setNsfwIntensity(value)
+                  localStorage.setItem('nsfwIntensity', String(value))
+                }}
+                className="w-full h-2 bg-[#2a2a2a] rounded-lg appearance-none cursor-pointer accent-[#3a3a3a]"
+              />
+              <div className="flex justify-between text-xs text-[#666] mt-1">
+                <span>Mild</span>
+                <span>Moderate</span>
+                <span>Intense</span>
+              </div>
+              <p className="text-xs text-[#666] mt-2">
+                Controls the intensity and explicitness of NSFW content. Lower values are more suggestive, higher values are more explicit.
+              </p>
             </div>
           </div>
         </div>

@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
+// Extract memories from a specific conversation (for end chat)
 export async function POST(req: NextRequest) {
   try {
     const { conversationId, personaId } = await req.json()
